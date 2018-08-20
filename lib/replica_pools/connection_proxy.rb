@@ -64,10 +64,6 @@ module ReplicaPools
       self.current = last_conn
     end
 
-    def transaction(*args, &block)
-      with_leader { leader.transaction(*args, &block) }
-    end
-
     def next_replica!
       return if within_leader_block?
       self.current = current_pool.next

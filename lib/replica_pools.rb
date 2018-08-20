@@ -20,32 +20,19 @@ module ReplicaPools
     def setup!
       ConnectionProxy.generate_safe_delegations
 
-      ActiveRecord::Base.send(:extend, ReplicaPools::Hijack)
-
       log :info, "Proxy loaded with: #{pools.keys.join(', ')}"
     end
 
-    def proxy
-      Thread.current[:replica_pools_proxy] ||= ReplicaPools::ConnectionProxy.new(
-        ActiveRecord::Base,
-        ReplicaPools.pools
-      )
+    def proxies
+      Thread.current[:replica_pools_proxies] ||= {}
     end
 
-    def current
-      proxy.current
+    def create_proxy(klass, db_name)
+      proxies[db_name] ||= ReplicaPools::ConnectionProxy.new(klass, ReplicaPools.pools[db_name])
     end
 
-    def next_replica!
-      proxy.next_replica!
-    end
-
-    def with_pool(*a)
-      proxy.with_pool(*a){ yield }
-    end
-
-    def with_leader
-      proxy.with_leader{ yield }
+    def fetch_proxy(db_name)
+      proxies[db_name]
     end
 
     def pools

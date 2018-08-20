@@ -5,19 +5,21 @@ module ReplicaPools
     include Enumerable
 
     def initialize
-      pools = {}
-      pool_configurations.group_by{|_, name, _| name }.each do |name, set|
-        pools[name.to_sym] = ReplicaPools::Pool.new(
-          name,
-          set.map{ |conn_name, _, replica_name|
-            connection_class(name, replica_name, conn_name)
-          }
-        )
+      pools = Hash.new {|h, k| h[k] = {}}
+      pool_configurations.group_by{|_, db_name, _, _| db_name }.each do |db_name, db_set|
+        db_set.group_by{|_, _, pool_name, _| pool_name }.each do |pool_name, pool_set|
+          pools[db_name.to_sym][pool_name.to_sym] = ReplicaPools::Pool.new(
+            pool_name,
+            pool_set.map{ |conn_name, _, _, replica_name|
+              connection_class(db_name, pool_name, replica_name, conn_name)
+            }
+          )
+        end
       end
 
       if pools.empty?
         ReplicaPools.log :info, "No pools found for #{ReplicaPools.config.environment}. Loading a default pool with leader instead."
-        pools[:default] = ReplicaPools::Pool.new('default', [ActiveRecord::Base])
+        pools[:default][:default] = ReplicaPools::Pool.new('default', [ActiveRecord::Base])
       end
 
       super pools
@@ -28,14 +30,15 @@ module ReplicaPools
     # finds valid pool configs
     def pool_configurations
       ActiveRecord::Base.configurations.map do |name, config|
-        next unless name.to_s =~ /#{ReplicaPools.config.environment}_pool_(.*)_name_(.*)/
-        [name, $1, $2]
+        next unless name.to_s =~ /#{ReplicaPools.config.environment}_db_(.*)_pool_(.*)_name_(.*)/
+        [name, $1, $2, $3]
       end.compact
     end
 
     # generates a unique ActiveRecord::Base subclass for a single replica
-    def connection_class(pool_name, replica_name, connection_name)
-      class_name = "#{pool_name.camelize}#{replica_name.camelize}"
+    def connection_class(db_name, pool_name, replica_name, connection_name)
+      class_name = "#{db_name.camelize}#{pool_name.camelize}#{replica_name.camelize}"
+      return ReplicaPools.const_get(class_name) if ReplicaPools.const_defined?(class_name)
 
       ReplicaPools.module_eval %Q{
         class #{class_name} < ActiveRecord::Base
