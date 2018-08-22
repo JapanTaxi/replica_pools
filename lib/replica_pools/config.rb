@@ -13,10 +13,19 @@ module ReplicaPools
     # Defaults are based on Rails version.
     attr_accessor :safe_methods
 
+    # When false, replica pools is completely disabled.
+    # Defaults to true
+    attr_accessor :enabled
+
     def initialize
       @environment        = 'development'
       @defaults_to_leader = false
       @safe_methods       = []
+      @enabled            = true
+    end
+
+    def enabled?
+      @enabled
     end
   end
 end

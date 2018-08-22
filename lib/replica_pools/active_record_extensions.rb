@@ -12,7 +12,7 @@ module ReplicaPools
     module ClassMethods
       def hijack_connection
         class << self
-          alias_method :connection, :connection_proxy
+          alias_method :connection, :connection_proxy if ReplicaPools.config.enabled?
         end
       end
 
