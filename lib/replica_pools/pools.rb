@@ -16,12 +16,6 @@ module ReplicaPools
           )
         end
       end
-
-      if pools.empty?
-        ReplicaPools.log :info, "No pools found for #{ReplicaPools.config.environment}. Loading a default pool with leader instead."
-        pools[:default][:default] = ReplicaPools::Pool.new('default', [ActiveRecord::Base])
-      end
-
       super pools
     end
 
