@@ -27,13 +27,9 @@ module ReplicaPools
       Thread.current[:replica_pools_proxies] ||= {}
     end
 
-    def create_proxy(klass, db_name)
+    def proxy(klass, db_name)
       raise "Connection pools for #{db_name} not found" if pools[db_name].empty?
       proxies[db_name] ||= ReplicaPools::ConnectionProxy.new(klass, pools[db_name])
-    end
-
-    def fetch_proxy(db_name)
-      proxies[db_name]
     end
 
     def pools

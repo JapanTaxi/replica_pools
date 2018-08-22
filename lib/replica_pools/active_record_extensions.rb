@@ -18,12 +18,11 @@ module ReplicaPools
 
       def use_replica_pools(db_name)
         @replica_pools_db_name = db_name
-        ReplicaPools.create_proxy(self, db_name)
         hijack_connection
       end
 
       def connection_proxy
-        ReplicaPools.fetch_proxy(replica_pools_db_name)
+        ReplicaPools.proxy(self, replica_pools_db_name)
       end
 
       def with_pool(*a)
