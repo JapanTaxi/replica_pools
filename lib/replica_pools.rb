@@ -3,12 +3,14 @@ require 'replica_pools/config'
 require 'replica_pools/pool'
 require 'replica_pools/pools'
 require 'replica_pools/active_record_extensions'
+require 'replica_pools/active_record_abstract_adapter_extensions'
 require 'replica_pools/hijack'
 require 'replica_pools/query_cache'
 require 'replica_pools/connection_proxy'
 
 require 'replica_pools/engine' if defined? Rails
 ActiveRecord::Base.send :include, ReplicaPools::ActiveRecordExtensions
+ActiveRecord::ConnectionAdapters::AbstractAdapter.send :prepend, ReplicaPools::ActiveRecordAbstractAdapterExtensions
 
 module ReplicaPools
   class << self

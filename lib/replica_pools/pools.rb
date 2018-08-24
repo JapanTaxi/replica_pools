@@ -11,7 +11,11 @@ module ReplicaPools
           pools[db_name.to_sym][pool_name.to_sym] = ReplicaPools::Pool.new(
             pool_name,
             pool_set.map{ |conn_name, _, _, replica_name|
-              connection_class(db_name, pool_name, replica_name, conn_name)
+              connection_class(db_name, pool_name, replica_name, conn_name).tap do |connection|
+                if connection.connection_config['host']
+                  connection.connection.host_name = connection.connection_config['host']
+                end
+              end
             }
           )
         end
