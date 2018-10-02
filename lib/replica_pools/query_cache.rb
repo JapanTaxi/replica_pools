@@ -12,7 +12,7 @@ module ReplicaPools
     (query_cache_methods - [:select_all]).each do |method_name|
       module_eval <<-END, __FILE__, __LINE__ + 1
         def #{method_name}(*a, &b)
-          ActiveRecord::Base.connection.#{method_name}(*a, &b)
+          route_to(leader, :#{method_name}, *a, &b)
         end
       END
     end
