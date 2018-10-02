@@ -87,6 +87,10 @@ module ReplicaPools
       send(method, *args, &block)
     end
 
+    def respond_to_missing?(method, include_private)
+      true
+    end
+
     def within_leader_block?
       leader_depth > 0
     end
