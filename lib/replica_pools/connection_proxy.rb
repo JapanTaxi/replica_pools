@@ -88,7 +88,7 @@ module ReplicaPools
     end
 
     def respond_to_missing?(method, include_private)
-      true
+      leader.retrieve_connection.respond_to?(method) || super
     end
 
     def within_leader_block?
