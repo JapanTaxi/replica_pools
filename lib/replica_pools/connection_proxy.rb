@@ -47,7 +47,7 @@ module ReplicaPools
     def with_pool(pool_name = 'default')
       last_conn, last_pool = self.current, self.current_pool
       self.current_pool = replica_pools[pool_name.to_sym] || default_pool
-      self.current = current_replica unless within_leader_block?
+      self.current = current_replica
       yield
     ensure
       self.current_pool = last_pool
