@@ -22,7 +22,8 @@ module ReplicaPools
       end
 
       def connection_proxy
-        ReplicaPools.proxy(self, replica_pools_db_name)
+        db_name = replica_pools_db_name
+        ReplicaPools.proxy(self, db_name) if db_name
       end
 
       def with_pool(*a)
