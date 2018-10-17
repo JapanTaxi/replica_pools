@@ -207,11 +207,12 @@ describe ReplicaPools do
       end
     end
 
-    it "should not switch to pool when nested inside with_leader" do
+    it "should switch to pool when nested inside with_leader" do
       @proxy.current.name.should eq('ReplicaPools::MainDefaultDb1')
       @proxy.with_leader do
+        @proxy.current.name.should eq('ActiveRecord::Base')
         @proxy.with_pool('secondary') do
-          @proxy.current.name.should eq('ActiveRecord::Base')
+          @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
         end
       end
     end
