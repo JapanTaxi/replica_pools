@@ -6,16 +6,21 @@ describe ReplicaPools do
   before(:each) do
     @sql = 'SELECT NOW()'
 
-    @proxy = ReplicaPools.proxy
+    @proxy = ReplicaPools.proxy(ActiveRecord::Base, :main)
     @leader = @proxy.leader.retrieve_connection
 
     reset_proxy(@proxy)
     create_replica_aliases(@proxy)
   end
 
-  it 'AR::B should respond to #connection_proxy' do
+  it 'AR:B should respond to #connection_proxy' do
     ActiveRecord::Base.should respond_to(:connection_proxy)
-    ActiveRecord::Base.connection_proxy.should be_kind_of(ReplicaPools::ConnectionProxy)
+    ActiveRecord::Base.connection_proxy.should be_nil
+  end
+
+  it 'TestModel should respond to #connection_proxy' do
+    TestModel.should respond_to(:connection_proxy)
+    TestModel.connection_proxy.should be_kind_of(ReplicaPools::ConnectionProxy)
   end
 
   it 'TestModel#connection should return an instance of ReplicaPools::ConnectionProxy' do
@@ -23,11 +28,11 @@ describe ReplicaPools do
   end
 
   it "should generate classes for each entry in the database.yml" do
-    defined?(ReplicaPools::DefaultDb1).should_not be_nil
-    defined?(ReplicaPools::DefaultDb2).should_not be_nil
-    defined?(ReplicaPools::SecondaryDb1).should_not be_nil
-    defined?(ReplicaPools::SecondaryDb2).should_not be_nil
-    defined?(ReplicaPools::SecondaryDb3).should_not be_nil
+    defined?(ReplicaPools::MainDefaultDb1).should_not be_nil
+    defined?(ReplicaPools::MainDefaultDb2).should_not be_nil
+    defined?(ReplicaPools::MainSecondaryDb1).should_not be_nil
+    defined?(ReplicaPools::MainSecondaryDb2).should_not be_nil
+    defined?(ReplicaPools::MainSecondaryDb3).should_not be_nil
   end
 
   context "with_leader" do
@@ -36,7 +41,7 @@ describe ReplicaPools do
       @proxy.with_leader do
         @proxy.current.should equal(@proxy.leader)
       end
-      @proxy.current.name.should eq('ReplicaPools::DefaultDb1')
+      @proxy.current.name.should eq('ReplicaPools::MainDefaultDb1')
     end
 
     it 'should revert to previous leader connection' do
@@ -66,9 +71,9 @@ describe ReplicaPools do
       end
     end
 
-    it 'should send all to leader even if transactions begins on AR::Base' do
-      @leader.should_receive(:select_all).exactly(1)
-      @default_replica1.should_receive(:select_all).exactly(0)
+    it 'should not send all to leader if transactions begins on AR::Base' do
+      @leader.should_receive(:select_all).exactly(0)
+      @default_replica1.should_receive(:select_all).exactly(1)
 
       ActiveRecord::Base.transaction do
         @proxy.select_all(@sql)
@@ -80,7 +85,7 @@ describe ReplicaPools do
     @default_replica1.should_receive(:select_all).exactly(2) # before and after the transaction go to replicas
     @leader.should_receive(:select_all).exactly(5)
     @proxy.select_all(@sql)
-    ActiveRecord::Base.transaction do
+    TestModel.transaction do
       5.times {@proxy.select_all(@sql)}
     end
     @proxy.select_all(@sql)
@@ -138,9 +143,9 @@ describe ReplicaPools do
   it 'should dynamically generate unsafe methods' do
     @leader.should_receive(:unsafe).and_return(true)
 
-    @proxy.should_not respond_to(:unsafe)
+    @proxy.methods.should_not include(:unsafe)
     @proxy.unsafe(@sql)
-    @proxy.should respond_to(:unsafe)
+    @proxy.methods.should include(:unsafe)
   end
 
   it 'should not replay errors on leader' do
@@ -163,39 +168,39 @@ describe ReplicaPools do
     it "should switch to the named pool" do
       @proxy.with_pool('secondary') do
         @proxy.current_pool.name.should eq('secondary')
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
       end
     end
 
     it "should switch to default pool if an unknown pool is specified" do
       @proxy.with_pool('unknown') do
         @proxy.current_pool.name.should eq('default')
-        @proxy.current.name.should eq('ReplicaPools::DefaultDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainDefaultDb1')
       end
     end
 
     it "should switch to default pool if no pool is specified" do
       @proxy.with_pool do
         @proxy.current_pool.name.should eq('default')
-        @proxy.current.name.should eq('ReplicaPools::DefaultDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainDefaultDb1')
       end
     end
 
     it "should cycle replicas only within the pool" do
       @proxy.with_pool('secondary') do
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
         @proxy.next_replica!
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb2')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb2')
         @proxy.next_replica!
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb3')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb3')
         @proxy.next_replica!
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
       end
     end
 
     it "should allow switching back to leader" do
       @proxy.with_pool('secondary') do
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
         @proxy.with_leader do
           @proxy.current.name.should eq('ActiveRecord::Base')
         end
@@ -203,7 +208,7 @@ describe ReplicaPools do
     end
 
     it "should not switch to pool when nested inside with_leader" do
-      @proxy.current.name.should eq('ReplicaPools::DefaultDb1')
+      @proxy.current.name.should eq('ReplicaPools::MainDefaultDb1')
       @proxy.with_leader do
         @proxy.with_pool('secondary') do
           @proxy.current.name.should eq('ActiveRecord::Base')
@@ -215,23 +220,23 @@ describe ReplicaPools do
       @proxy.next_replica!
 
       @proxy.current_pool.name.should eq('default')
-      @proxy.current.name.should eq('ReplicaPools::DefaultDb2')
+      @proxy.current.name.should eq('ReplicaPools::MainDefaultDb2')
 
       @proxy.with_pool('secondary') do
         @proxy.current_pool.name.should eq('secondary')
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
 
         @proxy.with_pool('default') do
           @proxy.current_pool.name.should eq('default')
-          @proxy.current.name.should eq('ReplicaPools::DefaultDb2')
+          @proxy.current.name.should eq('ReplicaPools::MainDefaultDb2')
         end
 
         @proxy.current_pool.name.should eq('secondary')
-        @proxy.current.name.should eq('ReplicaPools::SecondaryDb1')
+        @proxy.current.name.should eq('ReplicaPools::MainSecondaryDb1')
       end
 
       @proxy.current_pool.name.should eq('default')
-      @proxy.current.name.should eq('ReplicaPools::DefaultDb2')
+      @proxy.current.name.should eq('ReplicaPools::MainDefaultDb2')
     end
   end
 end

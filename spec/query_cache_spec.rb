@@ -5,7 +5,7 @@ describe ReplicaPools::QueryCache do
   before(:each) do
     @sql = 'SELECT NOW()'
 
-    @proxy = ReplicaPools.proxy
+    @proxy = ReplicaPools.proxy(ActiveRecord::Base, :main)
     @leader = @proxy.leader.retrieve_connection
 
     @leader.clear_query_cache
