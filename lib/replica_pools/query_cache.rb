@@ -23,6 +23,7 @@ module ReplicaPools
     def select_all(*args)
       # there may be more args for Rails 5.0+, but we only care about arel, name, and binds for caching.
       relation, name, raw_binds = args
+      raw_binds ||= [] # emulate default argument behavior
 
       if !query_cache_enabled || locked?(relation)
         return route_to(current, :select_all, *args)
@@ -35,14 +36,15 @@ module ReplicaPools
         arel, binds = relation, raw_binds
       end
 
-      sql = to_sql(arel, binds)
-
-      args[0] = sql
-      args[2] = binds
-
       if Gem::Version.new(ActiveRecord.version) < Gem::Version.new('5.1')
+        sql = to_sql(arel, binds)
+        args[0] = sql
+        args[2] = binds
         cache_sql(sql, binds) { route_to(current, :select_all, *args) }
       else
+        sql, binds = to_sql_and_binds(arel, binds) # `to_sql` doesnt return binds
+        args[0] = sql
+        args[2] = binds
         cache_sql(sql, name, binds) { route_to(current, :select_all, *args) }
       end
     end
